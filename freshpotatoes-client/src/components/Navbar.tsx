@@ -13,8 +13,8 @@ export default function Navbar() {
   // เชื่อมต่อ Auth Store สำหรับ Simple Login
   const { user, setUser, logout } = useAuthStore();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [email, setEmail] = useState("noppachet@example.com");
-  const [password, setPassword] = useState("1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 

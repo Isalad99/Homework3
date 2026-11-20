@@ -60,12 +60,7 @@ export default function SearchPage() {
           : movies.map((movie) => (
               <MovieCard
                 key={movie.id}
-                movie={{
-                  imdbID: String(movie.id),
-                  Title: movie.title,
-                  Year: movie.year,
-                  Poster: movie.poster,
-                }}
+                movie={movie}
               />
             ))}
       </div>
