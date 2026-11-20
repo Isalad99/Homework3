@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// 1. ตารางผู้ใช้งาน (รองรับ Simple Login ด้วย Email อย่างเดียวหรือ Email + Password)
+model User {
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  name        String?
+  password    String?      // แบบง่ายสำหรับส่งการบ้าน (ไม่เข้ารหัส)
+  reviews     Review[]
+  collections Collection[]
+  createdAt   DateTime     @default(now())
+}
+
+// 2. ตารางภาพยนตร์ (ทดแทนข้อมูลจาก OMDb / External API เดิม)
+model Movie {
+  id          Int          @id @default(autoincrement())
+  title       String
+  year        String
+  rated       String?
+  runtime     String?
+  genre       String
+  director    String?
+  actors      String?
+  plot        String
+  poster      String
+  imdbRating  String?
+  reviews     Review[]
+  collections Collection[]
+  createdAt   DateTime     @default(now())
+}
+
+// 3. ตารางรีวิว (CRUD: สร้าง แก้ไข ลบ รีวิวของหนังแต่ละเรื่อง)
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String
+  userId    Int
+  movieId   Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 4. ตารางคอลเลกชันส่วนตัว (Watchlist / Favorites)
+model Collection {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  movieId   Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, movieId]) // ป้องกันการเพิ่มหนังเรื่องเดิมซ้ำในลิสต์ของคนเดียวกัน
+}
