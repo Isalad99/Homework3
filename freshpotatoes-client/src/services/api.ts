@@ -176,3 +176,15 @@ export const removeFromCollection = async (
   });
   if (!res.ok) throw new Error("Failed to remove from collection");
 };
+
+export interface UserReviewWithMovie extends Review {
+  movie: Movie;
+}
+
+export const fetchUserReviews = async (
+  userId: number,
+): Promise<UserReviewWithMovie[]> => {
+  const res = await fetch(`${API_URL}/reviews/user/${userId}`);
+  if (!res.ok) throw new Error("Failed to fetch user reviews");
+  return res.json();
+};

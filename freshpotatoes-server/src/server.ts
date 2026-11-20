@@ -224,3 +224,17 @@ app.delete("/api/collections/:userId/:movieId", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`freshpotatoes-server running on http://localhost:${PORT}`);
 });
+
+// ดึงรายการรีวิวทั้งหมดของผู้ใช้คนนั้น (พร้อมข้อมูลหนัง)
+app.get("/api/reviews/user/:userId", async (req, res) => {
+  try {
+    const reviews = await prisma.review.findMany({
+      where: { userId: Number(req.params.userId) },
+      include: { movie: true },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(reviews);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch user reviews" });
+  }
+});
