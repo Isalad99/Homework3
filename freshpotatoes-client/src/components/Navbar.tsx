@@ -96,16 +96,6 @@ export default function Navbar() {
 
         {/* Right actions */}
         <div className="flex items-center gap-3 ml-auto">
-          {user && (
-            <Link
-              to="/collection"
-              id="navbar-collection"
-              className="text-sm font-medium hover:opacity-80 transition-opacity"
-            >
-              My Watchlist
-            </Link>
-          )}
-
           <Link
             to="/about"
             id="navbar-about"
@@ -133,9 +123,6 @@ export default function Navbar() {
                 className="dropdown-content menu bg-base-100 text-base-content rounded-box z-[60] w-52 p-2 shadow-lg mt-2"
               >
                 <li className="menu-title text-xs truncate">{user.email}</li>
-                <li>
-                  <Link to="/collection">My Watchlist</Link>
-                </li>
                 <li>
                   <button
                     type="button"

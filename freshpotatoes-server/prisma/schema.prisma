@@ -43,7 +43,7 @@ model Movie {
 // 3. ตารางรีวิว (CRUD: สร้าง แก้ไข ลบ รีวิวของหนังแต่ละเรื่อง)
 model Review {
   id        Int      @id @default(autoincrement())
-  rating    Int
+  rating    Float 
   comment   String
   userId    Int
   movieId   Int
@@ -58,9 +58,10 @@ model Collection {
   id        Int      @id @default(autoincrement())
   userId    Int
   movieId   Int
+  watched   Boolean  @default(false)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  @@unique([userId, movieId]) // ป้องกันการเพิ่มหนังเรื่องเดิมซ้ำในลิสต์ของคนเดียวกัน
+  @@unique([userId, movieId])
 }

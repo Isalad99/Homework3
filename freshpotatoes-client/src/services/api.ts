@@ -14,6 +14,7 @@ export interface Review {
   userId: number;
   movieId: number;
   createdAt: string;
+  updatedAt?: string;
   user?: {
     id: number;
     name?: string;
@@ -40,6 +41,8 @@ export interface CollectionItem {
   id: number;
   userId: number;
   movieId: number;
+  watched: boolean;
+  createdAt: string;
   movie: Movie;
 }
 
@@ -187,4 +190,45 @@ export const fetchUserReviews = async (
   const res = await fetch(`${API_URL}/reviews/user/${userId}`);
   if (!res.ok) throw new Error("Failed to fetch user reviews");
   return res.json();
+};
+
+// ==================== 5. WATCHED + MY REVIEW (แบบ miniProject 2) ====================
+// ตั้งสถานะ "ดูแล้ว" (ถ้ายังไม่อยู่ใน Watchlist จะถูกเพิ่มให้)
+export const setWatched = async (
+  userId: number,
+  movieId: number,
+  watched: boolean,
+): Promise<CollectionItem> => {
+  const res = await fetch(`${API_URL}/collections/${userId}/${movieId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ watched }),
+  });
+  if (!res.ok) throw new Error("Failed to update watched status");
+  return res.json();
+};
+
+// บันทึกรีวิวของเรา (1 คนต่อ 1 เรื่อง: ไม่มีให้สร้าง มีแล้วให้แก้)
+export const saveMyReview = async (
+  userId: number,
+  movieId: number,
+  data: { rating: number; comment: string },
+): Promise<UserReviewWithMovie> => {
+  const res = await fetch(`${API_URL}/reviews/user/${userId}/movie/${movieId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to save review");
+  return res.json();
+};
+
+export const deleteMyReview = async (
+  userId: number,
+  movieId: number,
+): Promise<void> => {
+  const res = await fetch(`${API_URL}/reviews/user/${userId}/movie/${movieId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete review");
 };

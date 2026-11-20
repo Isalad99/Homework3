@@ -1,60 +1,96 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { BookmarkCheckIcon, EyeIcon } from "../components/icons";
 import StarRating from "../components/StarRating";
-import { useMyReviewStore } from "../store/useMyReviewStore";
+import { useAuthStore } from "../store/useAuthStore";
 import {
-  useWatchlistStore,
-  type WatchlistMovie,
-} from "../store/useWatchlistStore";
+  addToCollection,
+  deleteMyReview,
+  fetchCollections,
+  fetchMovieById,
+  fetchUserReviews,
+  removeFromCollection,
+  saveMyReview,
+  setWatched,
+  type Movie,
+  type User,
+} from "../services/api";
 import "./style.css";
 
-function ReviewEditor({ id }: { id: string }) {
+function ReviewEditor({ movie, user }: { movie: Movie; user: User }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const review = useMyReviewStore((s) => s.reviews[id]);
-  const saveReview = useMyReviewStore((s) => s.saveReview);
-  const deleteReview = useMyReviewStore((s) => s.deleteReview);
+  // ข้อมูลถูกโหลดเสร็จแล้วจาก MyReviewDetailPage (กัน state เริ่มต้นว่างเปล่า)
+  const { data: collections = [] } = useQuery({
+    queryKey: ["collections", user.id],
+    queryFn: () => fetchCollections(user.id),
+  });
+  const { data: reviews = [] } = useQuery({
+    queryKey: ["userReviews", user.id],
+    queryFn: () => fetchUserReviews(user.id),
+  });
 
-  const watchItem = useWatchlistStore((s) => s.watchlist[id]);
-  const setWatched = useWatchlistStore((s) => s.setWatched);
-  const toggleWatchlist = useWatchlistStore((s) => s.toggleWatchlist);
-
-  const [editing, setEditing] = useState(!review);
-  const [rating, setRating] = useState(review?.rating ?? 0);
-  const [text, setText] = useState(review?.text ?? "");
-
-  const source = review ?? watchItem;
-  if (!source) {
-    return (
-      <div className="py-16 text-center space-y-3">
-        <p className="text-base-content/70">ไม่พบหนังเรื่องนี้</p>
-        <Link to="/my-ratings" className="btn btn-sm btn-secondary">
-          Back to My review
-        </Link>
-      </div>
-    );
-  }
-
-  const movie: WatchlistMovie = {
-    imdbID: source.imdbID,
-    Title: source.Title,
-    Year: source.Year,
-    Poster: source.Poster,
-  };
+  const review = reviews.find((r) => r.movieId === movie.id);
+  const watchItem = collections.find((c) => c.movieId === movie.id);
   const watched = watchItem?.watched ?? false;
   const inWatchlist = Boolean(watchItem);
 
+  const [editing, setEditing] = useState(!review);
+  const [rating, setRating] = useState(review?.rating ?? 0);
+  const [text, setText] = useState(review?.comment ?? "");
+
+  const refreshCollections = () =>
+    queryClient.invalidateQueries({ queryKey: ["collections", user.id] });
+  const refreshReviews = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["userReviews", user.id] }),
+      queryClient.invalidateQueries({ queryKey: ["movie", String(movie.id)] }),
+    ]);
+
+  const watchedMutation = useMutation({
+    mutationFn: (next: boolean) => setWatched(user.id, movie.id, next),
+    onSuccess: refreshCollections,
+  });
+
+  const watchlistMutation = useMutation({
+    mutationFn: async () => {
+      if (inWatchlist) {
+        await removeFromCollection(user.id, movie.id);
+      } else {
+        await addToCollection(user.id, movie.id);
+      }
+    },
+    onSuccess: refreshCollections,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      saveMyReview(user.id, movie.id, { rating, comment: text.trim() }),
+    onSuccess: async () => {
+      await refreshReviews();
+      setEditing(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteMyReview(user.id, movie.id),
+    onSuccess: async () => {
+      await refreshReviews();
+      navigate("/my-ratings");
+    },
+  });
+
   const handleSave = () => {
     if (rating <= 0) return;
-    saveReview(movie, { rating, text: text.trim() });
-    setEditing(false);
+    saveMutation.mutate();
   };
 
   const handleCancel = () => {
     if (review) {
       setRating(review.rating);
-      setText(review.text);
+      setText(review.comment);
       setEditing(false);
     } else {
       navigate("/my-ratings");
@@ -63,14 +99,13 @@ function ReviewEditor({ id }: { id: string }) {
 
   const handleDelete = () => {
     if (!window.confirm("Delete this review?")) return;
-    deleteReview(id);
-    navigate("/my-ratings");
+    deleteMutation.mutate();
   };
 
   return (
     <div className="space-y-4">
       <Link
-        to="/"
+        to="/my-ratings"
         aria-label="Back to My Reviews"
         className="btn btn-ghost btn-sm btn-circle -ml-2"
       >
@@ -99,7 +134,7 @@ function ReviewEditor({ id }: { id: string }) {
             <button
               type="button"
               className="flex items-center gap-2 text-sm font-bold text-neutral hover:opacity-70 transition-opacity"
-              onClick={() => setWatched(movie, !watched)}
+              onClick={() => watchedMutation.mutate(!watched)}
               aria-pressed={watched}
               title="Switch watched status"
             >
@@ -112,7 +147,7 @@ function ReviewEditor({ id }: { id: string }) {
               className={`hover:opacity-70 transition-opacity ${
                 inWatchlist ? "text-neutral" : "text-neutral/30"
               }`}
-              onClick={() => toggleWatchlist(movie)}
+              onClick={() => watchlistMutation.mutate()}
               aria-pressed={inWatchlist}
               title={
                 inWatchlist
@@ -132,12 +167,12 @@ function ReviewEditor({ id }: { id: string }) {
           {/* Poster + title */}
           <div className="flex flex-col items-center md:items-start gap-3">
             <img
-              src={movie.Poster}
-              alt={`Poster of ${movie.Title}`}
+              src={movie.poster}
+              alt={`Poster of ${movie.title}`}
               className="review-poster shadow-md"
             />
             <p className="font-bold text-neutral">
-              {movie.Title} {movie.Year}
+              {movie.title} ({movie.year})
             </p>
           </div>
 
@@ -168,7 +203,7 @@ function ReviewEditor({ id }: { id: string }) {
               />
             ) : (
               <div className="w-full min-h-64 md:min-h-80 flex-1 rounded-lg bg-base-100 p-4 text-sm sm:text-base leading-relaxed whitespace-pre-line break-words text-base-content">
-                {review?.text || (
+                {review?.comment || (
                   <span className="text-base-content/50">
                     (No review text written)
                   </span>
@@ -201,7 +236,7 @@ function ReviewEditor({ id }: { id: string }) {
                   type="button"
                   className="btn btn-accent"
                   onClick={handleSave}
-                  disabled={rating <= 0}
+                  disabled={rating <= 0 || saveMutation.isPending}
                   title={
                     rating <= 0
                       ? "Please rate the movie before saving"
@@ -231,5 +266,60 @@ function ReviewEditor({ id }: { id: string }) {
 
 export default function MyReviewDetailPage() {
   const { id = "" } = useParams<{ id: string }>();
-  return <ReviewEditor key={id} id={id} />;
+  const user = useAuthStore((s) => s.user);
+
+  const {
+    data: movie,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["movie", id],
+    queryFn: () => fetchMovieById(id),
+    enabled: !!user && id.length > 0,
+  });
+
+  // โหลด watchlist + review ให้เสร็จก่อน แล้วค่อยแสดงฟอร์ม
+  // (ไม่งั้น rating/text เริ่มต้นเป็นค่าว่าง และไม่อัปเดตตามรีวิวเดิมที่โหลดมาทีหลัง)
+  const collectionsQuery = useQuery({
+    queryKey: ["collections", user?.id],
+    queryFn: () => fetchCollections(user!.id),
+    enabled: !!user,
+    refetchOnMount: "always",
+  });
+  const reviewsQuery = useQuery({
+    queryKey: ["userReviews", user?.id],
+    queryFn: () => fetchUserReviews(user!.id),
+    enabled: !!user,
+    refetchOnMount: "always",
+  });
+
+  if (!user) {
+    return (
+      <div className="py-16 text-center space-y-3">
+        <p className="text-base-content/70">
+          กรุณาเข้าสู่ระบบ (Login) ที่มุมขวาบนเพื่อเขียนรีวิว
+        </p>
+      </div>
+    );
+  }
+
+  if (
+    isLoading ||
+    (user && (collectionsQuery.isPending || reviewsQuery.isPending))
+  ) {
+    return <p className="text-sm text-base-content/60">Loading...</p>;
+  }
+
+  if (isError || !movie) {
+    return (
+      <div className="py-16 text-center space-y-3">
+        <p className="text-base-content/70">ไม่พบหนังเรื่องนี้</p>
+        <Link to="/my-ratings" className="btn btn-sm btn-secondary">
+          Back to My review
+        </Link>
+      </div>
+    );
+  }
+
+  return <ReviewEditor key={movie.id} movie={movie} user={user} />;
 }

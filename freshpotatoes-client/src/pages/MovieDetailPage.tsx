@@ -1,5 +1,5 @@
 // src/pages/MovieDetailPage.tsx
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -9,11 +9,7 @@ import {
   fetchCollections,
   addToCollection,
   removeFromCollection,
-  createReview,
-  updateReview,
-  deleteReview,
   type Movie,
-  type Review,
 } from "../services/api";
 import { useAuthStore } from "../store/useAuthStore";
 import ErrorState from "../components/ErrorState";
@@ -48,13 +44,6 @@ function MovieDetailContent({ movie }: { movie: Movie }) {
     poster: movie.poster,
     imdbRating: movie.imdbRating || "",
   });
-
-  // State สำหรับเขียน/แก้ไขรีวิว (Create & Update Review)
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
-  const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
-  const [editRating, setEditRating] = useState(5);
-  const [editComment, setEditComment] = useState("");
 
   // เช็กสถานะ Watchlist จาก Database
   const { data: collections = [] } = useQuery({
@@ -97,59 +86,12 @@ function MovieDetailContent({ movie }: { movie: Movie }) {
     },
   });
 
-  // Mutations: Reviews CRUD
-  const createReviewMutation = useMutation({
-    mutationFn: () =>
-      createReview({
-        rating,
-        comment,
-        userId: user!.id,
-        movieId: movie.id,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["movie", String(movie.id)] });
-      queryClient.invalidateQueries({ queryKey: ["userReviews", user?.id] });
-      setComment("");
-      setRating(5);
-    },
-  });
-
-  const updateReviewMutation = useMutation({
-    mutationFn: (reviewId: number) =>
-      updateReview(reviewId, { rating: editRating, comment: editComment }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["movie", String(movie.id)] });
-      queryClient.invalidateQueries({ queryKey: ["userReviews", user?.id] });
-      setEditingReviewId(null);
-    },
-  });
-
-  const deleteReviewMutation = useMutation({
-    mutationFn: (reviewId: number) => deleteReview(reviewId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["movie", String(movie.id)] });
-      queryClient.invalidateQueries({ queryKey: ["userReviews", user?.id] });
-    },
-  });
-
   const poster = movie.poster || NO_POSTER;
   const genres = (movie.genre || "")
     .split(",")
     .map((g) => g.trim())
     .filter(Boolean);
   const meta = [movie.rated, movie.runtime].filter(Boolean).join(" • ");
-
-  function startEditReview(r: Review) {
-    setEditingReviewId(r.id);
-    setEditRating(r.rating);
-    setEditComment(r.comment);
-  }
-
-  function handleReviewSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!user || !comment.trim()) return;
-    createReviewMutation.mutate();
-  }
 
   return (
     <article className="max-w-3xl mx-auto">
@@ -252,146 +194,6 @@ function MovieDetailContent({ movie }: { movie: Movie }) {
         </dl>
       </section>
 
-      <div className="divider my-6" />
-
-      {/* Reviews Section (CRUD) */}
-      <section aria-label="Reviews" className="space-y-4">
-        <h2 className="text-lg font-bold text-base-content">
-          User Reviews ({movie.reviews?.length || 0})
-        </h2>
-
-        {/* Form เขียนรีวิว */}
-        {user ? (
-          <form
-            onSubmit={handleReviewSubmit}
-            className="p-4 rounded-xl bg-base-200 space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold">
-                เขียนรีวิวในชื่อ: {user.name || user.email}
-              </span>
-              <select
-                className="select select-bordered select-xs"
-                value={rating}
-                onChange={(e) => setRating(Number(e.target.value))}
-              >
-                {[5, 4, 3, 2, 1].map((n) => (
-                  <option key={n} value={n}>
-                    ★ {n} / 5
-                  </option>
-                ))}
-              </select>
-            </div>
-            <textarea
-              className="textarea textarea-bordered w-full text-sm"
-              placeholder="แสดงความคิดเห็นเกี่ยวกับภาพยนตร์เรื่องนี้..."
-              rows={2}
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              required
-            />
-            <button
-              type="submit"
-              disabled={createReviewMutation.isPending}
-              className="btn btn-primary btn-sm"
-            >
-              {createReviewMutation.isPending ? "Posting..." : "Post Review"}
-            </button>
-          </form>
-        ) : (
-          <div className="p-4 rounded-xl bg-base-200 text-sm text-base-content/70">
-            กรุณาเข้าสู่ระบบ (Login) ที่มุมขวาบนเพื่อเขียนรีวิว
-          </div>
-        )}
-
-        {/* รายการรีวิวทั้งหมด */}
-        <div className="space-y-3">
-          {movie.reviews?.length === 0 && (
-            <p className="text-sm text-base-content/60">
-              ยังไม่มีรีวิวสำหรับเรื่องนี้
-            </p>
-          )}
-
-          {movie.reviews?.map((rev) => (
-            <div
-              key={rev.id}
-              className="p-4 rounded-xl bg-base-200/60 border border-base-300"
-            >
-              {editingReviewId === rev.id ? (
-                <div className="space-y-2">
-                  <select
-                    className="select select-bordered select-xs"
-                    value={editRating}
-                    onChange={(e) => setEditRating(Number(e.target.value))}
-                  >
-                    {[5, 4, 3, 2, 1].map((n) => (
-                      <option key={n} value={n}>
-                        ★ {n} / 5
-                      </option>
-                    ))}
-                  </select>
-                  <textarea
-                    className="textarea textarea-bordered w-full text-sm"
-                    value={editComment}
-                    onChange={(e) => setEditComment(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => updateReviewMutation.mutate(rev.id)}
-                      className="btn btn-primary btn-xs"
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingReviewId(null)}
-                      className="btn btn-ghost btn-xs"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-semibold text-sm">
-                        {rev.user?.name || rev.user?.email || "User"}
-                      </span>
-                      <span className="ml-2 badge badge-warning badge-sm">
-                        ★ {rev.rating}/5
-                      </span>
-                    </div>
-
-                    {user?.id === rev.userId && (
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => startEditReview(rev)}
-                          className="btn btn-ghost btn-xs text-info"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteReviewMutation.mutate(rev.id)}
-                          className="btn btn-ghost btn-xs text-error"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-sm mt-2 text-base-content/90">
-                    {rev.comment}
-                  </p>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* Modal แก้ไขข้อมูลหนัง (Update Movie) */}
       {isEditingMovie && (

@@ -1,57 +1,48 @@
-import { Link } from 'react-router'
-import { useWatchlistStore, type WatchlistItem } from '../store/useWatchlistStore'
+import { Link } from "react-router";
+import type { CollectionItem } from "../services/api";
+import { BookmarkCheckIcon, EyeIcon } from "./icons";
 
-function BookmarkCheckIcon() {
-  return (
-    <svg viewBox="0 0 24 32" className="w-6 h-7" fill="currentColor" aria-hidden="true">
-      <path d="M2 2h20v28l-10-7-10 7V2z" />
-      <path d="M7 12l3.5 3.5L17 9" fill="none" stroke="#B0BA99" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
+interface WatchlistCardProps {
+  item: CollectionItem;
+  onRemove: () => void;
+  onToggleWatched: () => void;
+  disabled?: boolean;
 }
 
-function EyeIcon({ watched }: { watched: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" />
-      {watched ? (
-        <circle cx="12" cy="12" r="3.5" fill="currentColor" />
-      ) : (
-        <>
-          <circle cx="12" cy="12" r="3.5" />
-          <path d="M4 20L20 4" />
-        </>
-      )}
-    </svg>
-  )
-}
-
-export default function WatchlistCard({ item }: { item: WatchlistItem }) {
-  const toggleWatched = useWatchlistStore((s) => s.toggleWatched)
-  const removeFromWatchlist = useWatchlistStore((s) => s.removeFromWatchlist)
+export default function WatchlistCard({
+  item,
+  onRemove,
+  onToggleWatched,
+  disabled = false,
+}: WatchlistCardProps) {
+  const { movie, watched } = item;
 
   return (
     <li className="rounded-xl bg-accent p-2 shadow-sm">
-      <Link to={`/movie/${item.imdbID}`} className="block">
+      <Link to={`/movie/${movie.id}`} className="block">
         <img
-          src={item.Poster}
-          alt={`Poster of ${item.Title}`}
+          src={movie.poster}
+          alt={`Poster of ${movie.title}`}
           className="w-full aspect-[2/3] object-cover rounded-sm"
           loading="lazy"
         />
       </Link>
 
       <div className="mt-2 flex items-center gap-1">
-        <p className="flex-1 min-w-0 truncate text-xs text-neutral" title={item.Title}>
-          {item.Title}
+        <p
+          className="flex-1 min-w-0 truncate text-xs text-neutral"
+          title={movie.title}
+        >
+          {movie.title}
         </p>
 
         <button
           type="button"
           className="text-accent-content hover:opacity-70 transition-opacity"
-          onClick={() => removeFromWatchlist(item.imdbID)}
+          onClick={onRemove}
+          disabled={disabled}
           title="Added to Watch list (click to remove)"
-          aria-label={`Remove ${item.Title} from Watch list`}
+          aria-label={`Remove ${movie.title} from Watch list`}
         >
           <BookmarkCheckIcon />
         </button>
@@ -59,16 +50,21 @@ export default function WatchlistCard({ item }: { item: WatchlistItem }) {
         <button
           type="button"
           className={`transition-opacity hover:opacity-70 ${
-            item.watched ? 'text-accent-content' : 'text-accent-content/60'
+            watched ? "text-accent-content" : "text-accent-content/60"
           }`}
-          onClick={() => toggleWatched(item.imdbID)}
-          aria-pressed={item.watched}
-          title={item.watched ? 'Watched (click to unmark)' : 'Not watched (click to mark as watched)'}
-          aria-label={item.watched ? 'Unmark as watched' : 'Mark as watched'}
+          onClick={onToggleWatched}
+          disabled={disabled}
+          aria-pressed={watched}
+          title={
+            watched
+              ? "Watched (click to unmark)"
+              : "Not watched (click to mark as watched)"
+          }
+          aria-label={watched ? "Unmark as watched" : "Mark as watched"}
         >
-          <EyeIcon watched={item.watched} />
+          <EyeIcon watched={watched} />
         </button>
       </div>
     </li>
-  )
+  );
 }

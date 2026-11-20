@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Collection" ADD COLUMN "watched" BOOLEAN NOT NULL DEFAULT false;
+
+-- AlterTable
+ALTER TABLE "Review" ALTER COLUMN "rating" SET DATA TYPE DOUBLE PRECISION;

@@ -221,10 +221,6 @@ app.delete("/api/collections/:userId/:movieId", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`freshpotatoes-server running on http://localhost:${PORT}`);
-});
-
 // ดึงรายการรีวิวทั้งหมดของผู้ใช้คนนั้น (พร้อมข้อมูลหนัง)
 app.get("/api/reviews/user/:userId", async (req, res) => {
   try {
@@ -237,4 +233,75 @@ app.get("/api/reviews/user/:userId", async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch user reviews" });
   }
+});
+
+// ==================== 5. WATCHED + MY REVIEW (แบบ miniProject 2) ====================
+// สลับสถานะ "ดูแล้ว" ของหนังในคอลเลกชัน (ถ้ายังไม่อยู่ใน Watchlist จะเพิ่มให้อัตโนมัติ)
+app.patch("/api/collections/:userId/:movieId", async (req, res) => {
+  try {
+    const userId = Number(req.params.userId);
+    const movieId = Number(req.params.movieId);
+    const watched = Boolean(req.body.watched);
+    const item = await prisma.collection.upsert({
+      where: { userId_movieId: { userId, movieId } },
+      update: { watched },
+      create: { userId, movieId, watched },
+      include: { movie: true },
+    });
+    res.json(item);
+  } catch (error) {
+    console.error("PATCH collections error:", error);
+    res.status(500).json({ error: "Failed to update watched status" });
+  }
+});
+
+// บันทึกรีวิวของผู้ใช้ต่อหนังเรื่องนั้น (1 คน = 1 รีวิวต่อเรื่อง: ไม่มีให้สร้าง มีแล้วให้แก้)
+app.put("/api/reviews/user/:userId/movie/:movieId", async (req, res) => {
+  try {
+    const userId = Number(req.params.userId);
+    const movieId = Number(req.params.movieId);
+    const rating = Number(req.body.rating);
+    const comment = String(req.body.comment ?? "");
+    if (!(rating > 0 && rating <= 5)) {
+      return res
+        .status(400)
+        .json({ error: "Rating must be between 0.5 and 5" });
+    }
+
+    const existing = await prisma.review.findFirst({
+      where: { userId, movieId },
+    });
+    const review = existing
+      ? await prisma.review.update({
+          where: { id: existing.id },
+          data: { rating, comment },
+          include: { movie: true },
+        })
+      : await prisma.review.create({
+          data: { userId, movieId, rating, comment },
+          include: { movie: true },
+        });
+    res.json(review);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to save review" });
+  }
+});
+
+// ลบรีวิวของผู้ใช้ต่อหนังเรื่องนั้น
+app.delete("/api/reviews/user/:userId/movie/:movieId", async (req, res) => {
+  try {
+    await prisma.review.deleteMany({
+      where: {
+        userId: Number(req.params.userId),
+        movieId: Number(req.params.movieId),
+      },
+    });
+    res.json({ message: "Review deleted" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete review" });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`freshpotatoes-server running on http://localhost:${PORT}`);
 });
