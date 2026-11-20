@@ -99,12 +99,7 @@ export default function HomePage() {
           : movies.map((movie) => (
               <MovieCard
                 key={movie.id}
-                movie={{
-                  imdbID: String(movie.id),
-                  Title: movie.title,
-                  Year: movie.year,
-                  Poster: movie.poster,
-                }}
+                movie={movie}
               />
             ))}
       </div>
