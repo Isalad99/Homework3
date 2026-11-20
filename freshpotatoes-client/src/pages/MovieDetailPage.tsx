@@ -1,0 +1,219 @@
+import { useNavigate, useParams } from "react-router";
+
+import { useMovie } from "../hooks/useMovie";
+import { useWatchlistStore } from "../store/useWatchlistStore";
+import ErrorState from "../components/ErrorState";
+import MovieDetailSkeleton from "../components/MovieDetailSkeleton";
+import type { OmdbMovieDetail } from "../types/movie";
+
+const NO_POSTER = "https://placehold.co/400x600/B0BA99/3D1F0E?text=No+Poster";
+
+function valueOrNull(v: string | undefined): string | null {
+  return v && v !== "N/A" ? v : null;
+}
+
+interface InfoRowProps {
+  label: string;
+  value: string | null;
+}
+
+function InfoRow({ label, value }: InfoRowProps) {
+  if (!value) return null;
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-[8rem_1fr] gap-x-4 gap-y-0.5 py-2">
+      <dt className="text-sm font-semibold text-base-content/60">{label}</dt>
+      <dd className="text-sm text-base-content break-words">{value}</dd>
+    </div>
+  );
+}
+
+interface MovieDetailContentProps {
+  movie: OmdbMovieDetail;
+}
+
+function MovieDetailContent({ movie }: MovieDetailContentProps) {
+  const inWatchlist = useWatchlistStore((s) => movie.imdbID in s.watchlist);
+  const toggleWatchlist = useWatchlistStore((s) => s.toggleWatchlist);
+
+  const poster = valueOrNull(movie.Poster) ?? NO_POSTER;
+  const genres = (valueOrNull(movie.Genre) ?? "")
+    .split(",")
+    .map((g) => g.trim())
+    .filter((g) => g.length > 0);
+  const plot = valueOrNull(movie.Plot);
+  const meta = [
+    valueOrNull(movie.Rated),
+    valueOrNull(movie.Runtime),
+    valueOrNull(movie.Released),
+  ]
+    .filter((m): m is string => m !== null)
+    .join(" • ");
+
+  return (
+    <article className="max-w-3xl mx-auto">
+      {/* Title */}
+      <header className="text-center space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-base-content leading-tight">
+          {movie.Title}
+        </h1>
+        <p className="text-base sm:text-lg text-base-content/70">
+          ({movie.Year})
+        </p>
+        {meta && (
+          <p className="text-xs sm:text-sm text-base-content/60">{meta}</p>
+        )}
+        {genres.length > 0 && (
+          <ul className="flex flex-wrap justify-center gap-2 pt-1">
+            {genres.map((g) => (
+              <li key={g} className="badge badge-accent text-accent-content">
+                {g}
+              </li>
+            ))}
+          </ul>
+        )}
+      </header>
+
+      <div className="divider my-4" />
+
+      {/* Poster */}
+      <div className="flex justify-center">
+        <img
+          src={poster}
+          alt={`Poster of ${movie.Title}`}
+          className="w-48 sm:w-60 md:w-72 rounded-lg shadow-lg object-cover"
+        />
+      </div>
+
+      {/* Actions: watchlist */}
+      <section
+        aria-label="Favorite"
+        className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8"
+      >
+        <button
+          type="button"
+          className={`btn btn-sm ${inWatchlist ? "btn-secondary" : "btn-outline btn-secondary"}`}
+          onClick={() =>
+            toggleWatchlist({
+              imdbID: movie.imdbID,
+              Title: movie.Title,
+              Year: movie.Year,
+              Poster: poster,
+            })
+          }
+          aria-pressed={inWatchlist}
+        >
+          {inWatchlist ? "Already in Watchlist!" : "Add to Watchlist"}
+        </button>
+      </section>
+
+      <div className="divider my-6" />
+
+      {/* Plot */}
+      {plot && (
+        <section aria-label="Plot" className="space-y-2">
+          <h2 className="text-lg font-bold text-base-content">Plot</h2>
+          <p className="text-sm sm:text-base leading-relaxed text-base-content/90 whitespace-pre-line">
+            {plot}
+          </p>
+        </section>
+      )}
+
+      {/* Ratings from sources */}
+      {movie.Ratings.length > 0 && (
+        <section aria-label="Ratings from sources" className="mt-6">
+          <h2 className="text-lg font-bold text-base-content mb-3">
+            Ratings from sources
+          </h2>
+          <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {movie.Ratings.map((r) => (
+              <li
+                key={r.Source}
+                className="rounded-lg bg-base-300 px-4 py-3 text-center"
+              >
+                <p className="text-xl font-bold text-primary">{r.Value}</p>
+                <p className="text-xs text-base-content/60">{r.Source}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Details */}
+      <section aria-label="Additional Details" className="mt-6">
+        <h2 className="text-lg font-bold text-base-content mb-1">
+          Additional Details
+        </h2>
+        <dl className="divide-y divide-base-300">
+          <InfoRow label="Director" value={valueOrNull(movie.Director)} />
+          <InfoRow label="Writer" value={valueOrNull(movie.Writer)} />
+          <InfoRow label="Cast" value={valueOrNull(movie.Actors)} />
+          <InfoRow label="Language" value={valueOrNull(movie.Language)} />
+          <InfoRow label="Country" value={valueOrNull(movie.Country)} />
+          <InfoRow label="Awards" value={valueOrNull(movie.Awards)} />
+          <InfoRow
+            label="IMDb"
+            value={
+              valueOrNull(movie.imdbRating)
+                ? `${movie.imdbRating}/10 (${valueOrNull(movie.imdbVotes) ?? "-"} votes)`
+                : null
+            }
+          />
+        </dl>
+      </section>
+    </article>
+  );
+}
+
+export default function MovieDetailPage() {
+  const { id = "" } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { data, isLoading, isError, error, refetch, isFetching } = useMovie(id);
+
+  function handleBack() {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <button
+        type="button"
+        onClick={handleBack}
+        aria-label="Back"
+        className="btn btn-ghost btn-sm btn-circle -ml-2"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+          />
+        </svg>
+      </button>
+
+      {isLoading && <MovieDetailSkeleton />}
+
+      {isError && (
+        <ErrorState
+          message={
+            error.message || "Please check your connection and try again."
+          }
+          onRetry={() => void refetch()}
+          isRetrying={isFetching}
+        />
+      )}
+
+      {data && <MovieDetailContent movie={data} />}
+    </div>
+  );
+}
